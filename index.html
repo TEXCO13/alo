@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>1초마다 사진 찍어 서버에 업로드</title>
+</head>
+<body>
+<h3></h3>
+<video id="video" autoplay playsinline width="320" height="240" style="border:1px solid #ccc;"></video>
+
+<script>
+const video = document.getElementById('video');
+const canvas = document.createElement('canvas');
+const UPLOAD_ENDPOINT = 'http://localhost:5000/upload';  // Flask 서버 주소
+
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = stream;
+  } catch (e) {
+    alert('계속하시겠습니까?');
+    console.error(e);
+  }
+}
+
+async function sendFrame() {
+  canvas.width = video.videoWidth || 320;
+  canvas.height = video.videoHeight || 240;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.8);  // 용량 줄이려고 jpeg
+
+  // base64에서 앞부분 제거
+  const base64Data = dataUrl.replace(/^data:image\/jpeg;base64,/, '');
+
+  try {
+    const res = await fetch(UPLOAD_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: base64Data }),
+    });
+    if (!res.ok) throw new Error('업로드 실패');
+    console.log('이미지 업로드 성공');
+  } catch (e) {
+    console.error('업로드 실패:', e);
+  }
+}
+
+startCamera();
+
+setInterval(() => {
+  if (video.readyState === video.HAVE_ENOUGH_DATA) {
+    sendFrame();
+  }
+}, 1000);
+</script>
+</body>
+</html>
